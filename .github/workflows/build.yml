@@ -22,10 +22,14 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl repo python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
+          sudo apt-get install -y git curl python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
+          mkdir -p ~/bin
+          curl -fsSL https://googlesource.com | base64 -d > ~/bin/repo
+          chmod a+x ~/bin/repo
 
       - name: Initialize & Sync Kernel Source
         run: |
+          export PATH=~/bin:$PATH
           git config --global user.name "Builder"
           git config --global user.email "builder@example.com"
 
@@ -34,7 +38,7 @@ jobs:
           cd /mnt/kernel_work
 
           repo init -u https://googlesource.com -b common-android14-6.1-lts --depth=1
-          git clone https://github.com -b lineage-23.2 .repo/local_manifests
+          git clone https://github.com/mt6897-devs/kernel_manifest .repo/local_manifests
           repo sync -c --no-clone-bundle --no-tags -j$(nproc)
 
       - name: Enable ThinLTO & Compile Kernel + Modules
@@ -48,4 +52,4 @@ jobs:
         with:
           name: duchamp-kernel-thin-lto
           path: /mnt/kernel_work/out/dist/*
-    
+          
