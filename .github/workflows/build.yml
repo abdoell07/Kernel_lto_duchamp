@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git curl python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
-          git clone https://googlesource.com ~/git-repo
+          git clone https://android.googlesource.com ~/git-repo
           mkdir -p ~/bin
           cp ~/git-repo/repo ~/bin/repo
           chmod a+x ~/bin/repo
@@ -38,7 +38,7 @@ jobs:
           sudo chown -R $USER:$USER /mnt/kernel_work
           cd /mnt/kernel_work
 
-          repo init -u https://googlesource.com -b common-android14-6.1-lts --depth=1
+          repo init -u https://android.googlesource.com -b common-android14-6.1-lts --depth=1
           git clone https://github.com/mt6897-devs/kernel_manifest .repo/local_manifests
           repo sync -c --no-clone-bundle --no-tags -j$(nproc)
 
