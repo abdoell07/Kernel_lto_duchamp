@@ -1,0 +1,51 @@
+name: Build Duchamp Kernel (ThinLTO)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Free Disk Space & Setup 8GB Swap
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force || true
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          df -h
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
+
+      - name: Initialize & Sync Kernel Source
+        run: |
+          mkdir -p ~/bin
+          curl https://googleapis.com > ~/bin/repo
+          chmod a+x ~/bin/repo
+          export PATH=~/bin:$PATH
+          git config --global user.name "Builder"
+          git config --global user.email "builder@example.com"
+
+          mkdir kernel_work && cd kernel_work
+          repo init -u https://googlesource.com -b common-android14-6.1-lts --depth=1
+          git clone https://github.com .repo/local_manifests
+          repo sync -c --no-clone-bundle --no-tags -j$(nproc)
+
+      - name: Enable ThinLTO & Compile Kernel + Modules
+        run: |
+          cd kernel_work
+          # Menyisipkan flag --lto=thin ke dalam build.sh
+          sed -i 's/--config=stamp/--config=stamp --lto=thin/g' kernel_device_modules-6.1/build.sh
+          MODE=user ./kernel_device_modules-6.1/build.sh
+
+      - name: Package & Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: duchamp-kernel-thin-lto
+          path: kernel_work/out/dist/*
+          
