@@ -22,18 +22,17 @@ jobs:
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
+          sudo apt-get install -y git curl repo python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
 
       - name: Initialize & Sync Kernel Source
         run: |
-          mkdir -p ~/bin
-          curl https://googleapis.com > ~/bin/repo
-          chmod a+x ~/bin/repo
-          export PATH=~/bin:$PATH
           git config --global user.name "Builder"
           git config --global user.email "builder@example.com"
 
-          mkdir -p /mnt/kernel_work && cd /mnt/kernel_work
+          sudo mkdir -p /mnt/kernel_work
+          sudo chown -R $USER:$USER /mnt/kernel_work
+          cd /mnt/kernel_work
+
           repo init -u https://googlesource.com -b common-android14-6.1-lts --depth=1
           git clone https://github.com -b lineage-23.2 .repo/local_manifests
           repo sync -c --no-clone-bundle --no-tags -j$(nproc)
@@ -49,3 +48,4 @@ jobs:
         with:
           name: duchamp-kernel-thin-lto
           path: /mnt/kernel_work/out/dist/*
+    
