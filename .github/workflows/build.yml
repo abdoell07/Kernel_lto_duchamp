@@ -23,8 +23,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git curl python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
+          git clone https://googlesource.com ~/git-repo
           mkdir -p ~/bin
-          curl -fsSL https://googlesource.com | base64 -d > ~/bin/repo
+          cp ~/git-repo/repo ~/bin/repo
           chmod a+x ~/bin/repo
 
       - name: Initialize & Sync Kernel Source
