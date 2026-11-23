@@ -1,56 +1,68 @@
-name: Build Duchamp Kernel (ThinLTO)
+name: Build Kernel (duchamp)
 
 on:
   workflow_dispatch:
 
+env:
+  MANIFEST_URL: https://android.googlesource.com/kernel/manifest.git
+  MANIFEST_BRANCH: common-android14-6.1-lts
+  LOCAL_MANIFEST_URL: https://github.com/mt6897-devs/kernel_manifest
+
 jobs:
   build:
     runs-on: ubuntu-22.04
-    steps:
-      - name: Free Disk Space & Setup 8GB Swap
-        run: |
-          sudo swapoff -a || true
-          sudo rm -f /swapfile
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force || true
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          df -h
+    timeout-minutes: 360
 
-      - name: Install Build Dependencies
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          swap-storage: true
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git curl python3 python-is-python3 bc bison flex libssl-dev libelf-dev lz4 cpio rsync
-          git clone https://android.googlesource.com ~/git-repo
-          mkdir -p ~/bin
-          cp ~/git-repo/repo ~/bin/repo
-          chmod a+x ~/bin/repo
+          sudo apt-get install -y git curl python3 bc bison flex libssl-dev \
+            libelf-dev lld clang llvm zip unzip rsync cpio ccache
 
-      - name: Initialize & Sync Kernel Source
+      - name: Install repo
         run: |
-          export PATH=~/bin:$PATH
-          git config --global user.name "Builder"
+          mkdir -p "$HOME/bin"
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          git config --global user.name "builder"
           git config --global user.email "builder@example.com"
+          git config --global color.ui false
 
-          sudo mkdir -p /mnt/kernel_work
-          sudo chown -R $USER:$USER /mnt/kernel_work
-          cd /mnt/kernel_work
-
-          repo init -u https://android.googlesource.com -b common-android14-6.1-lts --depth=1
-          git clone https://github.com/mt6897-devs/kernel_manifest .repo/local_manifests
-          repo sync -c --no-clone-bundle --no-tags -j$(nproc)
-
-      - name: Enable ThinLTO & Compile Kernel + Modules
+      - name: Sync source
         run: |
-          cd /mnt/kernel_work
-          sed -i 's/--config=stamp/--config=stamp --lto=thin/g' kernel_device_modules-6.1/build.sh
-          MODE=user ./kernel_device_modules-6.1/build.sh
+          mkdir -p "$HOME/kernel"
+          cd "$HOME/kernel"
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH" --depth=1
+          git clone "$LOCAL_MANIFEST_URL" .repo/local_manifests
+          repo sync -c -j4 --no-tags --no-clone-bundle --optimized-fetch --force-sync
 
-      - name: Package & Upload Artifacts
+      - name: Build kernel and modules
+        run: |
+          cd "$HOME/kernel"
+          ./kernel_device_modules-6.1/build.sh
+
+      - name: Package output
+        run: |
+          cd "$HOME/kernel"
+          ls -lh out/dist/
+          mkdir -p "$GITHUB_WORKSPACE/result"
+          tar -czf "$GITHUB_WORKSPACE/result/duchamp-kernel-dist.tar.gz" -C out dist
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: duchamp-kernel-thin-lto
-          path: /mnt/kernel_work/out/dist/*
+          name: duchamp-kernel-dist
+          path: result/duchamp-kernel-dist.tar.gz
           
